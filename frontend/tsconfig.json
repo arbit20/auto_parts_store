@@ -6,6 +6,8 @@
   ],
   "compilerOptions": {
     "ignoreDeprecations": "6.0",
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
