@@ -13,6 +13,7 @@ RUN apt-get update \
         libcurl4-openssl-dev \
         libicu-dev \
         libonig-dev \
+        libsqlite3-dev \
         libxml2-dev \
         libzip-dev \
         unzip \
@@ -23,6 +24,7 @@ RUN apt-get update \
         mbstring \
         pcntl \
         pdo_mysql \
+        pdo_sqlite \
         zip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
