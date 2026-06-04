@@ -10,10 +10,12 @@ docker compose up -d            # levanta los 4 servicios
 docker compose ps               # esperar mariadb/backend/frontend = healthy
 ```
 
-- Frontend: **http://localhost:5174**  (el 5173 lo ocupa otro proyecto; el `.env` mapea a 5174)
+- Frontend: **http://localhost:5174**  (BAGG usa el 5174 en host y contenedor; el 5173 queda libre para otro proyecto)
 - Backend health: **http://localhost:8000/api/health**
 - phpMyAdmin: **http://localhost:8081**
 - Credenciales demo: **test@example.com** / **password**
+
+> Si tras login ves "Unauthenticated." en las listas: la sesión de Sanctum depende de que el origen (`localhost:5174`) esté en `SANCTUM_STATEFUL_DOMAINS` de `backend/.env`. Ya está configurado; si editas puertos, mantén ambos en sync.
 
 **Reset limpio (si algo quedó sucio):** `docker compose down -v && docker compose up -d` (reimporta el SQL y resiembra).
 
@@ -50,7 +52,14 @@ docker compose exec -T backend php artisan tinker --execute "echo DB::table('ofe
 - `stock_vs_kardex` (stock vs libro de inventario) = **0** ✅
 
 Backend: **35 tests** (`docker compose exec -T backend php artisan test`).
-E2E: `corepack pnpm --dir frontend test:e2e` (login, CRUD Productos/Proveedores, M:N Usuarios).
+E2E (10 tests: login, CRUD Productos/Proveedores, M:N Usuarios):
+
+```powershell
+# La primera vez (o tras recrear el contenedor sin el volumen de cache):
+docker compose exec frontend sh -lc "cd /workspace/frontend && npx playwright install chromium"
+# Correr la suite:
+docker compose exec frontend sh -lc "cd /workspace/frontend && pnpm test:e2e"
+```
 
 ---
 
