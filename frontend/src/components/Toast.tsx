@@ -37,7 +37,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed right-4 top-4 z-50 flex w-[min(92vw,24rem)] flex-col gap-3">
+      <div
+        className="fixed right-4 top-4 z-50 flex w-[min(92vw,24rem)] flex-col gap-3"
+        aria-live="polite"
+        aria-atomic="false"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -56,7 +60,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               className="rounded p-1 text-current/70 hover:bg-black/5 hover:text-current"
               aria-label="Cerrar mensaje"
             >
-              <X size={16} />
+              <X size={16} aria-hidden="true" />
             </button>
           </div>
         ))}

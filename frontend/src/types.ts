@@ -40,6 +40,41 @@ export type Categoria = {
   productos_count?: number
 }
 
+export type Rol = {
+  id: number
+  nombre: string
+  descripcion: string | null
+}
+
+export type UsuarioEstado = 'activo' | 'inactivo' | 'bloqueado'
+
+export type Usuario = {
+  id: number
+  nombre: string
+  apellido: string | null
+  email: string
+  telefono: string | null
+  ci_nit?: string | null
+  estado: UsuarioEstado
+  creado_en: string | null
+  roles?: Array<{ id: number; nombre: string }>
+}
+
+export type ProveedorTipo = 'empresa' | 'particular'
+
+export type Proveedor = {
+  id: number
+  nombre: string
+  tipo: ProveedorTipo
+  pais: string | null
+  contacto: string | null
+  telefono: string | null
+  email: string | null
+  usuario_id: number | null
+  usuario?: { id: number; nombre: string } | null
+  ofertas_count?: number
+}
+
 export type Producto = {
   id: number
   codigo: string

@@ -1,4 +1,4 @@
-import { Boxes, FolderTree, LayoutDashboard, LogOut, PackageSearch } from 'lucide-react'
+import { Boxes, Building2, FolderTree, LayoutDashboard, LogOut, PackageSearch, Users } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
 import { useToast } from './Toast'
@@ -7,6 +7,8 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/productos', label: 'Productos', icon: PackageSearch },
   { to: '/categorias', label: 'Categorias', icon: FolderTree },
+  { to: '/proveedores', label: 'Proveedores', icon: Building2 },
+  { to: '/usuarios', label: 'Usuarios', icon: Users },
 ]
 
 export function AppLayout() {
@@ -15,9 +17,13 @@ export function AppLayout() {
   const navigate = useNavigate()
 
   async function handleLogout() {
-    await logout()
-    notify('Sesion cerrada correctamente.', 'success')
-    navigate('/login', { replace: true })
+    try {
+      await logout()
+      notify('Sesion cerrada correctamente.', 'success')
+      navigate('/login', { replace: true })
+    } catch {
+      notify('No se pudo cerrar la sesion. Intenta de nuevo.', 'error')
+    }
   }
 
   return (
@@ -39,6 +45,7 @@ export function AppLayout() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.to === '/'}
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${
                     isActive
@@ -65,6 +72,8 @@ export function AppLayout() {
                   <NavLink
                     key={item.to}
                     to={item.to}
+                    end={item.to === '/'}
+                    aria-label={item.label}
                     className={({ isActive }) =>
                       `grid size-10 place-items-center rounded-md border ${
                         isActive
@@ -74,7 +83,7 @@ export function AppLayout() {
                     }
                     title={item.label}
                   >
-                    <Icon size={18} />
+                    <Icon size={18} aria-hidden="true" />
                   </NavLink>
                 )
               })}

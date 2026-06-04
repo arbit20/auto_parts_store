@@ -2,10 +2,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Save } from 'lucide-react'
 import { useEffect } from 'react'
-import type { ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
+import { FormField as Field } from '@/components/FormField'
 import { useToast } from '@/components/Toast'
 import { api, ApiError, type CategoriaPayload } from '@/lib/api'
 
@@ -146,22 +146,3 @@ export function CategoriaFormPage() {
   )
 }
 
-function Field({
-  label,
-  error,
-  children,
-  className = '',
-}: {
-  label: string
-  error?: string
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <label className={`block space-y-2 ${className}`}>
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-      {children}
-      {error ? <span className="text-sm text-red-700">{error}</span> : null}
-    </label>
-  )
-}

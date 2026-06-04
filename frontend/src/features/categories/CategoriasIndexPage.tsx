@@ -3,6 +3,7 @@ import { Edit, FolderTree, Plus, Search, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useToast } from '@/components/Toast'
 import { api, ApiError } from '@/lib/api'
 
@@ -11,6 +12,7 @@ export function CategoriasIndexPage() {
   const search = searchParams.get('search') ?? ''
   const page = Number(searchParams.get('page') ?? 1)
   const [searchInput, setSearchInput] = useState(search)
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; nombre: string } | null>(null)
   const queryClient = useQueryClient()
   const { notify } = useToast()
 
@@ -46,9 +48,14 @@ export function CategoriasIndexPage() {
     setSearchParams(next)
   }
 
-  async function handleDelete(id: number, nombre: string) {
-    if (window.confirm(`Eliminar la categoria "${nombre}"?`)) {
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    const id = pendingDelete.id
+    setPendingDelete(null)
+    try {
       await deleteMutation.mutateAsync(id)
+    } catch {
+      // onError ya notifica al usuario
     }
   }
 
@@ -73,32 +80,38 @@ export function CategoriasIndexPage() {
         className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm sm:flex-row"
       >
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} aria-hidden="true" />
+          <label htmlFor="buscar-categorias" className="sr-only">
+            Buscar categorias
+          </label>
           <input
+            id="buscar-categorias"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Buscar por nombre, descripcion o categoria padre"
             className="w-full rounded-md border border-slate-300 py-2 pl-10 pr-3 text-sm outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10"
           />
         </div>
-        <button className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100">
+        <button type="submit" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100">
           Buscar
         </button>
       </form>
 
       <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
         {categoriasQuery.isLoading ? (
-          <div className="p-8 text-center text-sm text-slate-500">Cargando categorias...</div>
+          <div role="status" aria-live="polite" className="p-8 text-center text-sm text-slate-500">
+            Cargando categorias...
+          </div>
         ) : categoriasQuery.isError ? (
-          <div className="p-8 text-center text-sm text-red-700">
+          <div role="alert" className="p-8 text-center text-sm text-red-700">
             {categoriasQuery.error instanceof ApiError
               ? categoriasQuery.error.message
               : 'No se pudieron cargar las categorias.'}
           </div>
         ) : !categoriasPage ? (
-          <div className="p-8 text-center text-sm text-slate-500">Sin datos disponibles.</div>
+          <div role="status" className="p-8 text-center text-sm text-slate-500">Sin datos disponibles.</div>
         ) : categoriasPage.data.length === 0 ? (
-          <div className="p-8 text-center">
+          <div role="status" className="p-8 text-center">
             <FolderTree className="mx-auto text-slate-400" size={36} />
             <p className="mt-3 font-medium text-slate-950">No hay categorias para mostrar.</p>
             <p className="mt-1 text-sm text-slate-500">Prueba otro filtro o crea una categoria.</p>
@@ -132,17 +145,17 @@ export function CategoriasIndexPage() {
                         <Link
                           to={`/categorias/${categoria.id}/editar`}
                           className="grid size-9 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100"
-                          title="Editar categoria"
+                          aria-label={`Editar categoria ${categoria.nombre}`}
                         >
-                          <Edit size={16} />
+                          <Edit size={16} aria-hidden="true" />
                         </Link>
                         <button
                           type="button"
-                          onClick={() => handleDelete(categoria.id, categoria.nombre)}
+                          onClick={() => setPendingDelete({ id: categoria.id, nombre: categoria.nombre })}
                           className="grid size-9 place-items-center rounded-md border border-red-200 text-red-700 hover:bg-red-50"
-                          title="Eliminar categoria"
+                          aria-label={`Eliminar categoria ${categoria.nombre}`}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={16} aria-hidden="true" />
                         </button>
                       </div>
                     </td>
@@ -156,13 +169,14 @@ export function CategoriasIndexPage() {
 
       {categoriasPage ? (
         <div className="flex items-center justify-between text-sm text-slate-600">
-          <span>
+          <span role="status" aria-live="polite">
             Mostrando {categoriasPage.meta.from ?? 0}-{categoriasPage.meta.to ?? 0} de{' '}
             {categoriasPage.meta.total}
           </span>
           <div className="flex gap-2">
             <button
               type="button"
+              aria-label="Ir a la pagina anterior"
               disabled={categoriasPage.meta.current_page <= 1}
               onClick={() => goToPage(categoriasPage.meta.current_page - 1)}
               className="rounded-md border border-slate-300 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -171,6 +185,7 @@ export function CategoriasIndexPage() {
             </button>
             <button
               type="button"
+              aria-label="Ir a la pagina siguiente"
               disabled={categoriasPage.meta.current_page >= categoriasPage.meta.last_page}
               onClick={() => goToPage(categoriasPage.meta.current_page + 1)}
               className="rounded-md border border-slate-300 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -180,6 +195,18 @@ export function CategoriasIndexPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Eliminar categoria"
+        description={pendingDelete ? `Esta accion eliminara "${pendingDelete.nombre}" de forma permanente.` : undefined}
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={confirmDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null)
+        }}
+      />
     </div>
   )
 }

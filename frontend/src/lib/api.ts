@@ -1,4 +1,13 @@
-import type { ApiCollection, ApiValidationErrors, Categoria, Producto, User } from '@/types'
+import type {
+  ApiCollection,
+  ApiValidationErrors,
+  Categoria,
+  Producto,
+  Proveedor,
+  Rol,
+  Usuario,
+  User,
+} from '@/types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
@@ -63,6 +72,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (!response.ok) {
     const message = payload?.message ?? 'No se pudo completar la solicitud.'
     throw new ApiError(message, response.status, payload?.errors)
+  }
+
+  if (payload === null && response.status !== 204) {
+    throw new ApiError('Respuesta inesperada del servidor.', response.status)
   }
 
   return payload as T
@@ -151,6 +164,53 @@ export const api = {
         csrf: true,
       }),
   },
+  proveedores: {
+    list: (input: { search?: string; page?: number; per_page?: number }) =>
+      request<ApiCollection<Proveedor>>(`/api/proveedores${params(input)}`),
+    get: (id: string | number) => request<{ data: Proveedor }>(`/api/proveedores/${id}`),
+    create: (body: ProveedorPayload) =>
+      request<{ data: Proveedor; message: string }>('/api/proveedores', {
+        method: 'POST',
+        body,
+        csrf: true,
+      }),
+    update: (id: string | number, body: ProveedorPayload) =>
+      request<{ data: Proveedor; message: string }>(`/api/proveedores/${id}`, {
+        method: 'PUT',
+        body,
+        csrf: true,
+      }),
+    delete: (id: string | number) =>
+      request<{ message: string }>(`/api/proveedores/${id}`, {
+        method: 'DELETE',
+        csrf: true,
+      }),
+  },
+  roles: {
+    list: () => request<{ data: Rol[] }>('/api/roles'),
+  },
+  usuarios: {
+    list: (input: { search?: string; page?: number; per_page?: number }) =>
+      request<ApiCollection<Usuario>>(`/api/usuarios${params(input)}`),
+    get: (id: string | number) => request<{ data: Usuario }>(`/api/usuarios/${id}`),
+    create: (body: UsuarioPayload) =>
+      request<{ data: Usuario; message: string }>('/api/usuarios', {
+        method: 'POST',
+        body,
+        csrf: true,
+      }),
+    update: (id: string | number, body: UsuarioPayload) =>
+      request<{ data: Usuario; message: string }>(`/api/usuarios/${id}`, {
+        method: 'PUT',
+        body,
+        csrf: true,
+      }),
+    delete: (id: string | number) =>
+      request<{ message: string }>(`/api/usuarios/${id}`, {
+        method: 'DELETE',
+        csrf: true,
+      }),
+  },
 }
 
 export type ProductoPayload = {
@@ -167,4 +227,24 @@ export type CategoriaPayload = {
   nombre: string
   descripcion: string | null
   categoria_padre_id: number | null
+}
+
+export type ProveedorPayload = {
+  nombre: string
+  tipo: 'empresa' | 'particular'
+  pais: string | null
+  contacto: string | null
+  telefono: string | null
+  email: string | null
+}
+
+export type UsuarioPayload = {
+  nombre: string
+  apellido: string | null
+  email: string
+  password?: string
+  telefono: string | null
+  ci_nit: string | null
+  estado: 'activo' | 'inactivo' | 'bloqueado'
+  roles: number[]
 }
