@@ -1,0 +1,590 @@
+GUIA DE VERIFICACION MVP - SPRINTS 0 A 6
+Proyecto: auto_parts_store / BAGG Auto Parts Store
+
+Objetivo:
+Validar por tu cuenta que el MVP funciona desde infraestructura hasta CRUD de
+productos y categorias.
+
+Requisitos previos:
+- Tener Docker Desktop abierto.
+- Estar en la raiz del proyecto:
+  C:\PrograAvanzada\auto_parts_store
+- Usar PowerShell para los comandos.
+- Rama esperada:
+  feature/mvp-sprints-0-6
+
+Credenciales demo:
+- Email: test@example.com
+- Password: password
+
+URLs:
+- Frontend: http://localhost:5173
+- Backend health: http://localhost:8000/api/health
+- phpMyAdmin: http://localhost:8081/index.php?route=/
+
+IMPORTANTE:
+El comando "docker compose down -v" borra los volumenes locales de Docker,
+incluida la base de datos. Usalo solo si quieres probar desde cero.
+
+
+PREPARACION GENERAL
+===================
+
+1. Verifica la rama:
+
+   git branch --show-current
+
+   Debe mostrar:
+   feature/mvp-sprints-0-6
+
+2. Si no existen los archivos .env, crealos:
+
+   Copy-Item .env.example .env
+   Copy-Item backend/.env.example backend/.env
+
+3. Levanta el proyecto:
+
+   docker compose up -d --build
+
+   Si phpMyAdmin no aparece despues en "docker compose ps", levantalo aparte:
+
+   docker compose up -d phpmyadmin
+
+4. Verifica que los contenedores esten healthy:
+
+   docker compose ps
+
+   Debes ver:
+   - backend: healthy
+   - frontend: healthy
+   - mariadb: healthy
+   - phpmyadmin: Up
+
+
+SPRINT 0 - BASE E INFRAESTRUCTURA
+=================================
+
+Objetivo:
+Validar Docker, Laravel, MariaDB, datos importados, migraciones y CORS.
+
+1. Health del backend:
+
+   Invoke-RestMethod http://localhost:8000/api/health
+
+   Debe devolver algo parecido a:
+   status : ok
+   service: Auto Parts Store API
+
+2. Verifica que existan productos importados:
+
+   docker compose exec -T backend php artisan tinker --execute "echo DB::table('productos')->count();"
+
+   Debe devolver:
+   5
+
+   Si devuelve 0 y quieres recargar la base desde cero:
+
+   docker compose down -v
+   docker compose up -d --build
+
+   Espera a que MariaDB y backend esten healthy y repite el conteo.
+
+3. Verifica CORS desde frontend hacia backend:
+
+   curl.exe -s -i -X OPTIONS http://localhost:8000/api/auth/login -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: POST"
+
+   Debes encontrar estas cabeceras:
+   Access-Control-Allow-Origin: http://localhost:5173
+   Access-Control-Allow-Credentials: true
+
+4. Abre el frontend:
+
+   http://localhost:5173
+
+   Debes ver la pantalla de login del sistema, no la pantalla starter de Vite.
+
+Criterio de exito S0:
+- Docker esta healthy.
+- /api/health responde OK.
+- productos count es 5 o mayor.
+- El frontend carga.
+- No hay error CORS.
+- phpMyAdmin abre en http://localhost:8081/index.php?route=/
+
+Nota si phpMyAdmin no abre:
+- Ejecuta:
+  docker compose up -d phpmyadmin
+- Luego revisa:
+  docker compose ps
+- Debe aparecer:
+  auto-parts-store-phpmyadmin-1
+
+
+SPRINT 1 - MODELOS ELOQUENT Y RELACIONES
+========================================
+
+Objetivo:
+Validar que Laravel puede leer las tablas de dominio y sus relaciones.
+
+1. Producto con relaciones:
+
+   docker compose exec -T backend php artisan tinker --execute "`$p = App\Models\Producto::with(['categoria','marcaPieza','compatibilidades.modelo.marcaVehiculo','imagenes','ofertas.vendedor'])->first(); echo `$p?->nombre;"
+
+   Debe imprimir el nombre de un producto y no debe lanzar errores.
+   Ejemplo esperado:
+   Pastillas de freno delanteras
+
+2. Categoria con padre:
+
+   docker compose exec -T backend php artisan tinker --execute "`$c = App\Models\Categoria::with('categoriaPadre')->whereNotNull('categoria_padre_id')->first(); echo `$c?->nombre . ' / padre: ' . `$c?->categoriaPadre?->nombre;"
+
+   Debe imprimir una categoria y el nombre de su padre.
+   Ejemplo esperado:
+   Filtros / padre: Motor
+
+3. Usuario de dominio con roles:
+
+   docker compose exec -T backend php artisan tinker --execute "`$u = App\Models\Usuario::with('roles')->first(); echo `$u?->nombre;"
+
+   Debe imprimir un usuario de dominio y no debe lanzar errores.
+   Ejemplo esperado:
+   Arbit
+
+Criterio de exito S1:
+- Los tres comandos responden sin excepciones.
+- Se pueden leer relaciones por nombre, no solo IDs.
+
+
+SPRINT 2 - AUTH SANCTUM
+=======================
+
+Objetivo:
+Validar register, login, logout y rutas protegidas.
+
+1. Ejecuta los tests de autenticacion:
+
+   docker compose exec -T backend php artisan test --filter=AuthApiTest
+
+   Debe terminar con tests en PASS.
+
+2. Verifica que /api/user sin sesion esta protegido:
+
+   curl.exe -s -i http://localhost:8000/api/user
+
+   Debe responder:
+   HTTP 401 Unauthorized
+   {"message":"Unauthenticated."}
+
+   Si responde HTTP 500 con "Route [login] not defined", reinicia backend:
+
+   docker compose restart backend
+
+   Luego repite el curl. Debe devolver 401, no 500.
+
+3. Verifica login manual:
+
+   Primero confirma que el usuario demo existe:
+
+   docker compose exec -T backend php artisan tinker --execute "echo DB::table('users')->where('email', 'test@example.com')->count();"
+
+   Debe devolver:
+   1
+
+   Abre:
+   http://localhost:5173
+
+   Ingresa:
+   email: test@example.com
+   password: password
+
+   Debes entrar al dashboard.
+
+   Si no entra desde el navegador:
+   - Refresca con Ctrl+F5.
+   - Cierra y abre de nuevo http://localhost:5173.
+   - Borra cookies/local storage de localhost si el navegador quedo con una
+     cookie vieja de una prueba anterior.
+   - Verifica que escribiste exactamente:
+     test@example.com
+     password
+
+   Si aparece "ApiError" con HTTP 502:
+   - Significa que el frontend/Vite no logro hacer proxy al backend.
+   - Reinicia el frontend para que tome el proxy Docker:
+
+     docker compose up -d frontend
+
+   - Verifica que el proxy ya responde con 401 y no con 502:
+
+     curl.exe -s -i http://localhost:5173/api/user
+
+   - Debe devolver:
+     HTTP 401 Unauthorized
+     {"message":"Unauthenticated."}
+
+   Prueba tecnica de login por API:
+
+   $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+   $originHeaders = @{ Origin = 'http://localhost:5173'; Accept = 'application/json' }
+   try { Invoke-WebRequest -Uri http://localhost:5173/sanctum/csrf-cookie -WebSession $session -Headers $originHeaders | Out-Null } catch { }
+   $xsrf = ($session.Cookies.GetCookies('http://localhost:5173') | Where-Object { $_.Name -eq 'XSRF-TOKEN' } | Select-Object -Last 1).Value
+   $headers = @{ Origin = 'http://localhost:5173'; Accept = 'application/json'; 'X-XSRF-TOKEN' = [System.Net.WebUtility]::UrlDecode($xsrf) }
+   $body = @{ email = 'test@example.com'; password = 'password' } | ConvertTo-Json -Compress
+   $login = Invoke-RestMethod -Uri http://localhost:5173/api/auth/login -Method Post -WebSession $session -Headers $headers -ContentType 'application/json' -Body $body
+   $login.user.email
+
+   Debe imprimir:
+   test@example.com
+
+4. Verifica logout:
+
+   En el frontend, usa el boton de salir/cerrar sesion.
+
+   Debes volver al login.
+
+Criterio de exito S2:
+- AuthApiTest pasa.
+- /api/user sin sesion responde 401.
+- Puedes iniciar y cerrar sesion desde la UI.
+
+
+SPRINT 3 - FRONTEND SHELL
+=========================
+
+Objetivo:
+Validar router, layout, rutas protegidas, auth context y cliente HTTP.
+
+1. Abre el frontend:
+
+   http://localhost:5173
+
+2. Sin login, intenta abrir una ruta protegida:
+
+   http://localhost:5173/productos
+
+   Debe redirigir al login.
+
+3. Inicia sesion con:
+
+   test@example.com
+   password
+
+4. Verifica que ves:
+
+   - Layout principal.
+   - Navegacion.
+   - Dashboard o pantalla inicial autenticada.
+   - Accesos a Productos y Categorias.
+
+5. Recarga el navegador con F5.
+
+   Debes seguir autenticado o la app debe recuperar el usuario sin romperse.
+
+Criterio de exito S3:
+- No aparece la pantalla inicial de Vite.
+- Las rutas protegidas funcionan.
+- El layout y la navegacion se mantienen tras login.
+
+
+SPRINT 4 - PRODUCTOS API
+========================
+
+Objetivo:
+Validar endpoints backend de productos.
+
+1. Ejecuta tests de productos:
+
+   docker compose exec -T backend php artisan test --filter=ProductoApiTest
+
+   Debe terminar en PASS.
+
+2. Verifica que productos esta protegido sin login:
+
+   curl.exe -s -i http://localhost:8000/api/productos
+
+   Debe responder:
+   HTTP 401 Unauthorized
+
+3. Verifica desde el navegador luego de iniciar sesion:
+
+   - Login en http://localhost:5173
+   - Entrar a Productos
+
+   Debes ver productos con:
+   - Codigo.
+   - Nombre.
+   - Categoria por nombre.
+   - Marca por nombre.
+   - Precio/stock si aplica.
+
+4. Verifica busqueda:
+
+   En Productos, escribe una palabra existente, por ejemplo:
+   filtro
+   freno
+   aceite
+
+   La tabla debe filtrar resultados.
+
+Criterio de exito S4:
+- ProductoApiTest pasa.
+- API protegida responde 401 sin sesion.
+- La UI consume productos paginados y con relaciones legibles.
+
+
+SPRINT 5 - PRODUCTOS UI
+=======================
+
+Objetivo:
+Validar CRUD completo de productos desde el frontend.
+
+1. Login:
+
+   http://localhost:5173
+   test@example.com / password
+
+2. Ir a Productos.
+
+3. Crear producto:
+
+   Haz clic en crear/nuevo producto.
+
+   Datos sugeridos:
+   - Codigo: TEST-001
+   - Nombre: Producto prueba sprint 5
+   - Descripcion: Producto creado para verificacion manual
+   - Categoria: selecciona una existente
+   - Marca pieza: selecciona una existente si el campo aparece
+   - Peso kg: 1.5
+   - Activo: si
+
+   Guarda.
+
+   Debes volver al listado o ver confirmacion de guardado.
+
+4. Buscar el producto:
+
+   En el buscador escribe:
+   TEST-001
+
+   Debe aparecer el producto creado.
+
+5. Ver detalle:
+
+   Abre el producto creado.
+
+   Debes ver los datos principales y relaciones por nombre.
+
+6. Editar:
+
+   Cambia el nombre a:
+   Producto prueba sprint 5 editado
+
+   Guarda.
+
+   Debe reflejarse el cambio.
+
+7. Validacion:
+
+   Intenta crear o editar dejando campos obligatorios vacios, por ejemplo:
+   - codigo vacio
+   - nombre vacio
+   - categoria vacia
+
+   Debes ver errores de validacion y no debe guardarse.
+
+8. Eliminar:
+
+   Elimina el producto TEST-001.
+
+   Debe pedir confirmacion.
+   Al confirmar, el producto ya no debe aparecer en el listado.
+
+9. Estados visuales:
+
+   Durante la carga debe verse un estado loading.
+   Si una busqueda no tiene resultados, debe verse estado empty.
+   Si ocurre error, debe verse mensaje/toast de error.
+
+Criterio de exito S5:
+- Puedes crear, listar, buscar, ver, editar y eliminar productos.
+- Las validaciones se muestran en pantalla.
+- Hay confirmacion al eliminar.
+- La app redirige o actualiza el listado tras guardar.
+
+
+SPRINT 6 - CATEGORIAS VERTICAL SLICE
+====================================
+
+Objetivo:
+Validar CRUD completo de categorias backend + frontend.
+
+1. Ejecuta tests de categorias:
+
+   docker compose exec -T backend php artisan test --filter=CategoriaApiTest
+
+   Debe terminar en PASS.
+
+2. En la UI:
+
+   Login en:
+   http://localhost:5173
+
+   Ir a Categorias.
+
+3. Ver listado:
+
+   Debes ver categorias con:
+   - Nombre.
+   - Descripcion si existe.
+   - Categoria padre por nombre cuando aplique.
+
+4. Crear categoria:
+
+   Datos sugeridos:
+   - Nombre: Categoria prueba sprint 6
+   - Descripcion: Categoria creada para verificacion manual
+   - Categoria padre: dejar vacio o seleccionar una existente
+
+   Guarda.
+
+   Debe aparecer en el listado.
+
+5. Editar categoria:
+
+   Cambia el nombre a:
+   Categoria prueba sprint 6 editada
+
+   Guarda.
+
+   Debe reflejarse el cambio.
+
+6. Validar padre invalido:
+
+   Si la UI permite seleccionar la misma categoria como padre, intenta hacerlo.
+   Debe mostrar error y no debe guardar.
+
+   Si la UI no permite seleccionarla, eso tambien es correcto porque evita el
+   caso invalido antes de enviar.
+
+7. Eliminar categoria vacia:
+
+   Elimina la categoria de prueba.
+
+   Debe pedir confirmacion y luego desaparecer del listado.
+
+8. Intentar eliminar categoria con productos:
+
+   Busca una categoria usada por productos, por ejemplo Frenos o Motor.
+   Intenta eliminarla.
+
+   Debe bloquearse con error, porque tiene productos o subcategorias asociadas.
+
+Criterio de exito S6:
+- CategoriaApiTest pasa.
+- Puedes crear, editar y eliminar categorias vacias.
+- Se muestra categoria padre por nombre.
+- No se permite que una categoria sea su propio padre.
+- No se elimina una categoria con productos o hijas.
+
+
+CHECK FINAL DEL MVP
+===================
+
+Ejecuta estos comandos antes de considerar todo aprobado:
+
+1. Backend tests:
+
+   docker compose exec -T backend php artisan test
+
+   Esperado:
+   19 passed
+
+2. Frontend lint:
+
+   corepack pnpm --dir frontend lint
+
+   Esperado:
+   sin errores
+
+3. Frontend build:
+
+   corepack pnpm --dir frontend build
+
+   Esperado:
+   build terminado correctamente
+
+4. Health:
+
+   Invoke-RestMethod http://localhost:8000/api/health
+
+   Esperado:
+   status ok
+
+5. Productos en DB:
+
+   docker compose exec -T backend php artisan tinker --execute "echo DB::table('productos')->count();"
+
+   Esperado:
+   5
+
+
+PROBLEMAS FRECUENTES
+====================
+
+1. El frontend no carga:
+
+   docker compose ps
+   docker compose logs -f frontend
+
+2. El backend no responde:
+
+   docker compose ps
+   docker compose logs -f backend
+
+3. Productos devuelve 0:
+
+   Probablemente el volumen de MariaDB quedo viejo o los tests tocaron la base.
+   Recarga desde cero si puedes borrar datos locales:
+
+   docker compose down -v
+   docker compose up -d --build
+
+4. Error de conexion a DB desde Docker:
+
+   En backend/.env debe estar:
+   DB_HOST=mariadb
+   DB_DATABASE=bagg_autopartes
+
+5. Error de conexion a DB ejecutando Artisan desde el host:
+
+   Si ejecutas php artisan directamente fuera del contenedor, cambia
+   temporalmente backend/.env a:
+
+   DB_HOST=127.0.0.1
+
+   Luego limpia config:
+
+   cd backend
+   php artisan config:clear
+
+6. Login no entra:
+
+   Verifica que el seeder haya creado el usuario:
+
+   docker compose exec -T backend php artisan tinker --execute "echo DB::table('users')->where('email', 'test@example.com')->count();"
+
+   Debe devolver:
+   1
+
+
+RESULTADO ESPERADO FINAL
+========================
+
+Si todo pasa, el MVP S0-S6 esta funcionando:
+- Infraestructura Docker + MariaDB + Laravel.
+- Auth Sanctum SPA.
+- Frontend con rutas protegidas.
+- CRUD productos.
+- CRUD categorias.
+- Tests backend y checks frontend correctos.

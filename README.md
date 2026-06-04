@@ -71,7 +71,7 @@ Valores importantes por defecto:
 FRONTEND_PORT=5173
 BACKEND_PORT=8000
 DB_FORWARD_PORT=3306
-DB_DATABASE=auto_parts_store
+DB_DATABASE=bagg_autopartes
 DB_USERNAME=auto_parts_user
 DB_PASSWORD=auto_parts_password
 MARIADB_ROOT_PASSWORD=root_password
@@ -82,8 +82,9 @@ Nota importante sobre `DB_HOST`:
 - Dentro de Docker, el backend debe usar `DB_HOST=mariadb`.
 - Desde el host, Laravel debe usar `DB_HOST=127.0.0.1`.
 
-Por eso `docker-compose.yml` define `DB_HOST=mariadb`, mientras que
-`backend/.env.example` usa `DB_HOST=127.0.0.1`.
+Por eso `docker-compose.yml` y `backend/.env.example` usan `DB_HOST=mariadb`.
+Si ejecutas Artisan desde el host, cambia temporalmente `backend/.env` a
+`DB_HOST=127.0.0.1`.
 
 No hagas commit de `.env`, `backend/.env`, `node_modules`, `vendor`, `dist` ni
 volumenes locales. Estan ignorados por Git.
@@ -119,7 +120,7 @@ Password root: root_password
 
 Usuario app: auto_parts_user
 Password app: auto_parts_password
-Base app: auto_parts_store
+Base app: bagg_autopartes
 ```
 
 Verificar contenedores:
@@ -152,12 +153,15 @@ Usa `down -v` solo si quieres reiniciar la base de datos desde cero.
 
 ## 5. Base de datos
 
-Hay dos contextos de base de datos en el repo:
+La base principal del MVP es `bagg_autopartes`.
 
-1. `auto_parts_store`: base usada por Laravel y creada por Docker Compose.
-   Laravel ejecuta sus migraciones al iniciar el contenedor backend.
-2. `bagg_autopartes`: base de dominio definida por los SQL del proyecto:
-   `bagg_autopartes_v1.sql` y `bagg_autopartes__v2.sql`.
+En un volumen nuevo de MariaDB, Docker importa automaticamente:
+
+1. `bagg_autopartes_v1.sql`
+2. `bagg_autopartes__v2.sql`
+
+Despues el contenedor backend ejecuta migraciones Laravel sobre la misma base
+para crear las tablas de autenticacion, cache, jobs, sesiones y Sanctum.
 
 Para verificar migraciones Laravel desde el host:
 
@@ -172,12 +176,21 @@ Si el comando falla por conexion, revisa que `backend/.env` tenga:
 ```env
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=auto_parts_store
+DB_DATABASE=bagg_autopartes
 DB_USERNAME=root
 DB_PASSWORD=root_password
 ```
 
-Para cargar la base de dominio `bagg_autopartes` usando Docker:
+Si ya tenias un volumen creado antes de este MVP y necesitas recargar los SQL
+desde cero:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+Tambien puedes cargar la base de dominio `bagg_autopartes` manualmente usando
+Docker:
 
 PowerShell:
 
@@ -264,14 +277,26 @@ Rutas actuales del backend:
 ```text
 GET /                  devuelve estado basico de la app
 GET /api/health        devuelve {"status":"ok","service":"Auto Parts Store API"}
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout  requiere auth:sanctum
 GET /api/user          requiere auth:sanctum
+GET /api/productos     requiere auth:sanctum
+POST /api/productos    requiere auth:sanctum
+GET /api/productos/{id} requiere auth:sanctum
+PUT /api/productos/{id} requiere auth:sanctum
+DELETE /api/productos/{id} requiere auth:sanctum
+GET /api/categorias    requiere auth:sanctum
+POST /api/categorias   requiere auth:sanctum
+GET /api/categorias/{id} requiere auth:sanctum
+PUT /api/categorias/{id} requiere auth:sanctum
+DELETE /api/categorias/{id} requiere auth:sanctum
 GET /sanctum/csrf-cookie
 GET /up
 ```
 
-El frontend actual es la base React/Vite inicial. La logica de negocio de Bagg
-esta documentada principalmente en los SQL `bagg_autopartes_v1.sql` y
-`bagg_autopartes__v2.sql`.
+El frontend actual incluye login SPA con Sanctum, rutas protegidas, dashboard y
+CRUD completo de productos y categorias.
 
 ## 9. Problemas frecuentes
 
@@ -337,7 +362,8 @@ docker compose down -v
 docker compose up --build
 ```
 
-Luego vuelve a importar los SQL si necesitas `bagg_autopartes`.
+Al volver a levantar, MariaDB importara los SQL automaticamente en el volumen
+nuevo.
 
 ### Dependencias rotas
 
@@ -364,7 +390,7 @@ docker compose up --build
 
 ## 10. Flujo recomendado para colaboradores
 
-1. Crear una rama desde `develop`.
+1. Crear una rama desde la base full-stack acordada.
 2. Levantar el proyecto con Docker.
 3. Verificar `GET /api/health`.
 4. Hacer cambios pequenos y enfocados.
